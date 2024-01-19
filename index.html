@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Realtime location tracker</title>
 
-    <!-- leaflet css  -->
+    <!-- leaflet css -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
 
     <style>
@@ -24,28 +24,23 @@
 
 <body>
     <div id="map"></div>
-    <!-- leaflet js  -->
+
+    <!-- leaflet js -->
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
-        // Map initialization 
         var map = L.map('map').setView([11.668051317080224, 78.13302069625774], 13);
-
-        // osm layer
         var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         });
         osm.addTo(map);
 
         var marker, circle;
+        var locationPermissionGranted = false;
 
         if (!navigator.geolocation) {
             console.log("Your browser doesn't support geolocation feature!")
         } else {
-            // Initial position request
             navigator.geolocation.getCurrentPosition(getPosition, handleLocationError, { enableHighAccuracy: true });
-
-            // Set up watchPosition to continuously monitor the position
-            var watchId = navigator.geolocation.watchPosition(getPosition, handleLocationError, { enableHighAccuracy: true });
         }
 
         function getPosition(position) {
@@ -53,6 +48,16 @@
             var long = position.coords.longitude;
             var accuracy = position.coords.accuracy;
 
+            if (!locationPermissionGranted) {
+                locationPermissionGranted = true;
+                navigator.geolocation.watchPosition(getPosition, handleLocationError, { enableHighAccuracy: true });
+            }
+
+            updateMap(lat, long, accuracy);
+            sendLocationToRaspberryPi(lat, long, accuracy);
+        }
+
+        function updateMap(lat, long, accuracy) {
             if (!marker) {
                 marker = L.marker([lat, long]).addTo(map);
             } else {
@@ -67,8 +72,19 @@
             }
 
             map.setView([lat, long], 13);
+        }
 
-            console.log("Your coordinate is: Lat: " + lat + " Long: " + long + " Accuracy: " + accuracy)
+        function sendLocationToRaspberryPi(lat, long, accuracy) {
+            const locationData = {
+                latitude: lat,
+                longitude: long,
+                accuracy: accuracy
+            };
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `http://sonaautonamousrobo.ddns.net:3000`, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.send(JSON.stringify(locationData));
         }
 
         function handleLocationError(error) {
